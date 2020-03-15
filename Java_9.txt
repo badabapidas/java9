@@ -1,0 +1,182 @@
+New features in java 9
+===========================
+- JShell
+- JPMS (Java Platform Module System)
+- JLink (Java Linker)
+- HTTP/2 Client
+- Process API Updates
+- Stream API Enhancements
+- Private Methods in Interfaces
+- Try with Resources Enahancements
+- Diamond Operator Enhancements
+- SafeVarargs Annotation Enhancements
+- Factory Methods for creating unmodifiable Collections
+
+
+#### Factory Methods for creating unmodifiable Collections
+
+javap java.util.List	// will show the profile of List interface
+
+In Java9 there are many factory methods available to create a unmodifiable collection like List.of(...), Set.of(...). There are 11 overloading methods are there as an arg starting from empty to 10. Along with that one vararg method also available List.of(E ...). Now there can be a question if we have already a vararg method why we need those 11 extra oerloade methods. The answer is that usage of vararg is very costly. So in the worst case condition if no other option are there then only it is advised to use vararg method.
+
+# JPMS (Java Platform Module System)
+
+Modularity concept introduced in Java 9 as the part of Jigsaw project. It is the main important concept in java 9.
+
+Until Java 1.8 version we can develop applications by writing several classes, interfaces and enums. We can places these components inside packages and we can convert these packages into jar files. By placing these jar files in the classpath, we can run our applications. An enterprise application can contain 1000s of jar files also.
+
+Hence jar file is nothing but a group of packages and each package contains several .class files.
+
+But in Java 9, a new construct got introduced which is nothing but 'Module'. From java 9 version onwards we can develop applications by using module concept. Module is nothing but a group of packages similar to jar file. But the specialty of module when compared with jar file is, module can contain configuration information also. Hence module is more powerful than jar file. The configuration information of module should be specified in a special file named with module-info.java
+
+What is the need of JPMS?
+
+Problem-1: Unexpected NoClassDefFoundError in middle of program execution
+There is no way to specify jar file dependencies until java 1.8V.At runtime,if any dependent jar file is missing then in the middle of execution of our program, we will get NoClassDefFoundError, which is not at all recommended.
+
+Problem 2: Version Conflicts or Shadowing Problems
+If JVM required any .class file, then it always searches in the classpath from left to right until required match found. classpath = jar1;jar2;jar3;jar4. If jar4 requires Test.class file of jar3.But Different versions of Test.class is available in jar1, jar2 and jar3. In this case jar1 Test.class file will be considered, because JVM will always search from Left to Right in the classpath. It will create version conflicts and causes abnormal behavior of program. 
+But in java9 module system, there is a way to specify dependent modules information for every module seperately.JVM will always consider only required module and there is no order importance. Hence version conflicts won't be raised in Java 9.
+
+Problem 3: Security problem
+There is no mechanism to hide packages of jar file. Assume pack1 can be used by other jar files, but pack2 is just for internal purpose only. Until Java 8 there is no way to specify this information. Everything in jar file is public and available to everyone. Hence there may be a chance of Security problems. 
+But in Java 9 Module system, we can export particular package of a module. Only this exported package can be used by other modules. The remaining packages of that module are not visible to outside. Hence Strong encapsulation is available in Java 9 and there is no chance of security problems. Even though class is public, if module won't export the corresponding package, then it cannot be accessed by other modules. Hence public is not really that much public in Java 9 Module System. Module can offer Strong Encapsulation than Jar File.
+
+Problem 4: JDK/JRE having Monolithic Structure and Very Large Size
+The number of classes in Java is increasing very rapidly from version to version.
+JDK 1.0V having 250+ classes
+JDK 1.1V having 500+ classes
+...
+JDK 1.8V having 4000+ classes
+And all these classes are available in rt.jar. Hence the size of rt.jar is increasing from version to version. The size of rt.jar in Java 1.8Version is around 60 MB. To run small program also, total rt.jar should be loaded, which makes our application heavy weight and not suitable for IOT applications and micro services which are targeted for portable devices.
+
+It will create memory and performance problems also.(This is something like inviting a Big Elephant in our Small House: Installing a Heavy Weight Java application in a small portable device). But in java 9, rt.jar removed. Instead of rt.jar all classes are maintained in the form of modules. Hence from Java 9 onwards JDK itself modularized. Whenever we are executing a program only required modules will be loaded instead of loading all modules, which makes our application light weighted. Now we can use java applications for small devices also. From Java 9 version onwards, by using JLINK , we can create our own very small custom JREs with only required modules.
+
+
+
+#Compile module with --module-source-path option
+javac --module-source-path src -d out -m moduleA
+
+#Run the class with --module-path option
+java --module-path out -m moduleA/pack1.Test
+
+
+Couple of mandatory cases to be remembered in case of module approach
+Case-1:If module-info.java is not available then the code won't compile and we will get error. Hence module-info.java is mandatory for every module.
+Command: javac --module-source-path src -d out -m moduleA 
+Output: error: module moduleA not found in module source path
+
+Case-2: Every class inside module should be part of some package, otherwise we will get compile time error saying : unnamed package is not allowed in named modules
+
+Case-3: The module name should not ends with digit(like module1,module2 etc),otherwise we will get warning at compile time.
+Command: javac --module-source-path src -d out -m module1
+Output: warning: [module] module name component module1 should avoid terminal digits
+
+moudule A{
+	require moduleB;
+	requires transitive moduleC;
+	requires static moduleD;
+	exports pack1;
+	exports pack2 to moduleB,moduleC;
+}
+
+Cyclic dependency not allowed in modules
+Different modules same package name not allowed
+Module graph to show the dependency graphs between the modules
+
+Module Resolution Process (MRP):
+In the case of traditional classpath, JVM won't check the required .class files at the beginning. While executing program if JVM required any .class file, then only JVM will search in the classpath for the required .class file. If it is available then it will be loaded and used and if it is not available then at runtime we will get NoClassDefFoundError,which is not at all recommended. But in module programming, JVM will search for the required modules in the module-path before it starts execution. If any module is missing at the beginning only JVM will identify and won't start its execution. Hence in modular programming, there is no chance of getting NoClassDefFoundError
+in the middle of program execution.
+
+java --list-modules
+javac --module-source-path src -d out -m moduleA,moduleB,moduleC,moduleD,useModule
+java --module-path out --show-module-resolution -m useModule/packA.Test
+
+
+JLINK
+Until 1.8 version to run a small Java program (like Hello World program) also, we should use a bigger JRE which contains all java's inbuilt 4300+ classes. It increases the size of Java Runtime environment and Java applications. Due to this Java is not suitable for IOT devices and Micro Services. (No one invite a bigger Elephant into their small house).
+To overcome this problem, Java people introduced Compact Profiles in Java 8. But they didn't succeed that much. In Java 9, they introduced a permanent solution to reduce the size of Java Runtime Environment, which is nothing but JLINK.
+JLINK is Java's new command line tool(which is available in JDK_HOME\bin) which allows us to link sets of only required modules (and their dependencies) to create a runtime image (our own JRE).
+
+Now, our Custom JRE contains only required modules and classes instead of having all 4300+ classes.
+It reduces the size of Java Runtime Environment, which makes java best suitable for IOT and micro services.
+
+
+Copy all the needed modules in out folder
+out
+|-java.base.jmod
+|-demoModule
+	|-module-info.class
+	|-packA
+		|-Test.class
+Now we can create our own JRE with JLINK command
+C:\Users\Durga\Desktop>jlink --module-path out --add-modules demoModule,java.base --output durgajre
+
+We can run our application with our own custom jre (durgajre) as follows
+C:\Users\Durga\Desktop\durgajre\bin>java -m demoModule/packA.Test 
+o/p: JLINK Demo To create our own customized & small JRE
+
+#For more compress
+C:\Users\Durga\Desktop>jlink --module-path out --add-modules demoModule,java.base --compress 2 --output durgajre2
+C:\Users\Durga\Desktop\durgajre2\bin>java -m demoModule/packA.Test 
+o/p: JLINK Demo To create our own customized & small JRE
+
+#Providing our own name to the application with launcher plugin:
+C:\Users\Durga\Desktop>jlink --module-path out --add-modules demoModule,java.base --launcher demoapp=demoModule/packA.Test --compress 2 --output durgajre3
+Now we can run our application only with the name demoapp
+C:\Users\Durga\Desktop\durgajre3\bin>demoapp
+JLINK Demo To create our own customized & small JRE
+If we set the path PATH = C:\Users\Durga\Desktop\durgajre3\bin
+Then we can run our application from anywhere.
+D:\>demoapp
+E:\>demoapp
+
+#HTTP 2 CLIENT
+Problems with Traditional HttpURLConnection class:
+1. It is very difficult to use.
+2. It supports only HTTP/1.1 protocol but not HTTP/2(2015) where
+	A. We can send only one request at a time per TCP Connection, which creates network traffic problems and performance problems.
+	B. It supports only Text data but not binary data
+3. It works only in Blocking Mode (Synchronous Mode), which creates performance problems.
+
+Because of these problems, slowly developers started using 3rd party Http Clients like Apache Http client and Google Http client etc.
+JDK 9 Engineers addresses these issues and introduced a brand new HTTP/2 Client in Java 9.
+
+Advantages of Java 9 HTTP/2 Client:
+1. It is Lightweight and very easy to use.
+2. It supports both HTTP/1.1 and HTTP/2.
+3. It supports both Text data and Binary Data (Streams)
+4. It can work in both Blocking and Non-Blocking Modes (Synchronous Communication and Asynchronous Communication)
+5. It provides better performance and Scalability when compared with traditional HttpURLConnection.
+
+
+Important Components of Java 9 HTTP/2 Client:
+In Java 9, HTTP/2 Client provided as incubator module.
+
+Module: jdk.incubator.httpclient
+Package: jdk.incubator.http
+Mainly 3 important classes are available:
+1. HttpClient
+2. HttpRequest
+3. HttpResponse
+
+Please go through the git example to get a better understanding how to use http client2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
